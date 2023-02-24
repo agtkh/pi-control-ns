@@ -1,4 +1,6 @@
-#!/usr/bin/env python3
+"""
+Copyright(c) 2023 K.Agata
+"""
 
 import os, sys
 import threading
