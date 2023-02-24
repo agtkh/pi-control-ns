@@ -1,5 +1,7 @@
+# SPDX-FileCopyrightText: 2023 K.Agata
+# SPDX-License-Identifier: GPL-3.0
 """
-Copyright(c) 2023 K.Agata
+This is free software.
 """
 
 import os, sys
@@ -28,7 +30,7 @@ class Con:
             ('analog', c_uint8 * 6), ('vibrator_input_report', c_uint8)
         ]
 
-    def __init__(self, usb_gadget_path='/sys/kernel/config/usb_gadget/procon'):
+    def __init__(self, usb_gadget_path='pi-control-ns'):
         self.control_data = bytearray.fromhex('810000000008800008800c')
         self.control = self.ControlStruct.from_buffer(self.control_data)
         self.counter = 0
@@ -41,9 +43,9 @@ class Con:
 
     def start(self):
         # Re-connect USB Gadget device
-        os.system('echo > /sys/kernel/config/usb_gadget/procon/UDC')
+        os.system(f'echo > {self.base_path}/UDC')
         os.system(
-            'ls /sys/class/udc > /sys/kernel/config/usb_gadget/procon/UDC')
+            f'ls /sys/class/udc > {self.base_path}/UDC')
         time.sleep(0.8)
 
         self.gadget = os.open('/dev/hidg0', os.O_RDWR | os.O_NONBLOCK)

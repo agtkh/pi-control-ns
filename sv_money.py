@@ -1,5 +1,7 @@
+# SPDX-FileCopyrightText: 2023 K.Agata
+# SPDX-License-Identifier: GPL-3.0
+
 """
-Copyright(c) 2023 K.Agata
 ポケモンSVでAボタン連打することで学校最強大会を周回して金策する。
 30分ごとSlackにスクリーンショットを送って敗退していないか見る。
 """
