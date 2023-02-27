@@ -12,20 +12,25 @@ from . import switch
 from . import captureboard as cb
 import slack_sdk
 
-slack_token = os.getenv('SLACK_API_TOKEN')
-slack_channel = os.getenv('SLACK_CHANNEL_ID')
+SLACK_TOKEN = os.getenv('SLACK_API_TOKEN')
+SLACK_CHANNEL = os.getenv('SLACK_CHANNEL_ID')
 
 
-def send_to_slack():
-    now = datetime.now()
-    d_str = now.strftime('%Y/%m/%d %H:%M:%S')
-    title = f'ss of pokemon sv at {d_str}'
+def send_msg_to_slack(msg_text):
     try:
-        slack = slack_sdk.WebClient(token=slack_token)
-        slack.files_upload_v2(channel=slack_channel,
-                              file='ss.jpg',
-                              title=title,
-                              initial_comment=title)
+        slack_cl = slack_sdk.WebClient(token=SLACK_TOKEN)
+        slack_cl.chat_postMessage(text=msg_text, channel=SLACK_CHANNEL)
+    except slack_sdk.errors.SlackApiError as e:
+        print('Slack APIのエラー', e)
+
+
+def send_img_to_slack(msg_text, file_path='ss.jpg'):
+    try:
+        slack_cl = slack_sdk.WebClient(token=SLACK_TOKEN)
+        slack_cl.files_upload_v2(channel=SLACK_CHANNEL,
+                                 file=file_path,
+                                 title=msg_text,
+                                 initial_comment=msg_text)
     except slack_sdk.errors.SlackApiError as e:
         print('Slack APIのエラー', e)
 
@@ -33,8 +38,10 @@ def send_to_slack():
 def screen_shot_loop():
     while True:
         if cb.screenshot('ss.jpg'):
-            send_to_slack()
+            date_str = datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+            send_img_to_slack(date_str, 'ss.jpg')
         time.sleep(60 * 30)  # 30 mins
+
 
 
 if __name__ == '__main__':

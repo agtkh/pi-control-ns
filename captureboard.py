@@ -3,10 +3,17 @@
 
 import cv2
 import time
-
 """
 ラズパイに接続したキャプチャボードを処理する。
 """
+
+
+
+def decode_fourcc(v):
+    # https://amdkkj.blogspot.com/2017/06/opencv-python-for-windows-playing-videos_17.html
+    v = int(v)
+    return "".join([chr((v >> 8 * i) & 0xFF) for i in range(4)])
+
 
 def screenshot(save_path='ss.jpg'):
     print('start screenshot')
@@ -19,22 +26,25 @@ def screenshot(save_path='ss.jpg'):
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # 遅延削減対策
+    time.sleep(0.3)
 
-    time.sleep(0.2)
+    print(
+        f"[{decode_fourcc(cap.get(cv2.CAP_PROP_FOURCC))} "
+        f"{cap.get(cv2.CAP_PROP_FPS):.1f}fps "
+        f"{cap.get(cv2.CAP_PROP_FRAME_WIDTH):.0f}x{cap.get(cv2.CAP_PROP_FRAME_HEIGHT):.0f}]"
+    )
+
     if not cap.isOpened():
         print('Could not open device.')
-        return None
+        return False
 
-    for i in range(100):
-        ret, cv2_img = cap.read()
-        if not ret: continue
-        cnt_non_zero = cv2.countNonZero(cv2_img[0])
-        # print(f'[{i:2d}] shape:{cv2_img.shape}, cnt non zero: {cnt_non_zero}')
-        if cnt_non_zero > 0: break
+    for i in range(4):
+        # dummy
+        _, cv2_img = cap.read()
 
-    if not cnt_non_zero > 0:
-        # タイムアウト
-        print('Request timed out')
+    ret, cv2_img = cap.read()
+    if not ret:
+        print('Could not get a screenshot.')
         return False
 
     # リサイズ
@@ -43,19 +53,21 @@ def screenshot(save_path='ss.jpg'):
     # cv2_img = cv2.resize(cv2_img, (int(width * 0.5), int(height * 0.5)))
 
     # 保存
-    q = 10
-    cv2.imwrite(save_path, cv2_img, [int(cv2.IMWRITE_JPEG_QUALITY), q])
+    # cv2.imwrite(save_path, cv2_img, [int(cv2.IMWRITE_JPEG_QUALITY), q])
+    cv2.imwrite(save_path, cv2_img)
 
     # メモリ上で圧縮
     # ret, img = cv2.imencode(".jpg", cv2_img, (cv2.IMWRITE_JPEG_QUALITY, 10))
     # decoded = cv2.imdecode(cv2_img, flags=cv2.IMREAD_COLOR)
 
     cap.release()
+    cv2.destroyAllWindows()
 
     end = time.time()
 
     print(f'done screenshot ({(end - start) * 1000:.2f}ms)')
     return True
+
 
 if __name__ == '__main__':
     screenshot('test.jpg')
