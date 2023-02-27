@@ -1,6 +1,5 @@
 # SPDX-FileCopyrightText: 2023 K.Agata
 # SPDX-License-Identifier: GPL-3.0
-
 """
 ポケモンSVでAボタン連打することで学校最強大会を周回して金策する。
 30分ごとSlackにスクリーンショットを送って敗退していないか見る。
@@ -10,52 +9,11 @@ import time, sys, os
 import threading
 from datetime import datetime
 from . import switch
-import cv2
+from . import captureboard as cb
 import slack_sdk
 
 slack_token = os.getenv('SLACK_API_TOKEN')
 slack_channel = os.getenv('SLACK_CHANNEL_ID')
-
-def screen_shot():
-    print('screen shotting...')
-    DEVICE_ID = 0
-    CAP_WIDTH = 1920
-    CAP_HEIGHT = 1080
-
-    cap = cv2.VideoCapture(DEVICE_ID)
-
-    if not cap:
-        return False
-
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAP_WIDTH)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAP_HEIGHT)
-    time.sleep(0.2)
-
-    for i in range(100):
-        ret, cv2_img = cap.read()
-        if not ret: continue
-        cnt_non_zero = cv2.countNonZero(cv2_img[0])
-        print(f'[{i:2d}] shape:{cv2_img.shape}, cnt non zero: {cnt_non_zero}')
-        if cnt_non_zero > 0: break
-
-    # リサイズ
-    # height = cv2_img.shape[0]
-    # width = cv2_img.shape[1]
-    # cv2_img = cv2.resize(cv2_img, (int(width * 0.5), int(height * 0.5)))
-
-    # 保存
-    q = 10
-    cv2.imwrite("frame.jpg", cv2_img, [int(cv2.IMWRITE_JPEG_QUALITY), q])
-
-    # メモリ上で圧縮
-    # ret, img = cv2.imencode(".jpg", cv2_img, (cv2.IMWRITE_JPEG_QUALITY, 10))
-    # decoded = cv2.imdecode(cv2_img, flags=cv2.IMREAD_COLOR)
-
-    cap.release()
-
-    time.sleep(0.2)
-    print('done screen shot')
-    return True
 
 
 def send_to_slack():
@@ -65,7 +23,7 @@ def send_to_slack():
     try:
         slack = slack_sdk.WebClient(token=slack_token)
         slack.files_upload_v2(channel=slack_channel,
-                              file='frame.jpg',
+                              file='ss.jpg',
                               title=title,
                               initial_comment=title)
     except slack_sdk.errors.SlackApiError as e:
@@ -73,8 +31,9 @@ def send_to_slack():
 
 
 def screen_shot_loop():
-    while screen_shot():
-        send_to_slack()
+    while True:
+        if cb.screenshot('ss.jpg'):
+            send_to_slack()
         time.sleep(60 * 30)  # 30 mins
 
 
