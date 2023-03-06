@@ -5,11 +5,15 @@
 30分ごとSlackにスクリーンショットを送って敗退していないか見る。
 """
 
-import time, sys, os
+import sys, os
+
+sys.path.append(os.pardir)
+
+import switch
+import time
 import threading
 from datetime import datetime
-from . import switch
-from . import captureboard as cb
+import captureboard as cb
 import slack_sdk
 
 SLACK_TOKEN = os.getenv('SLACK_API_TOKEN')
@@ -41,7 +45,6 @@ def screen_shot_loop():
             date_str = datetime.now().strftime('%Y/%m/%d %H:%M:%S')
             send_img_to_slack(date_str, 'ss.jpg')
         time.sleep(60 * 30)  # 30 mins
-
 
 
 if __name__ == '__main__':

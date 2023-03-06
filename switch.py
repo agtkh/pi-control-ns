@@ -9,10 +9,11 @@ import threading
 import time
 from ctypes import LittleEndianStructure, c_uint8
 
+
 class Con:
 
     class ControlStruct(LittleEndianStructure):
-        # コントロールデータ構造体
+        # コントロールデータ構造体 (11bytes)
         _fields_ = [
             ('connection_info', c_uint8, 4), ('battery_level', c_uint8, 4),
             ('button_y', c_uint8, 1), ('button_x', c_uint8, 1),
@@ -30,22 +31,56 @@ class Con:
             ('analog', c_uint8 * 6), ('vibrator_input_report', c_uint8)
         ]
 
-    def __init__(self, usb_gadget_path='pi-control-ns'):
+    def __init__(self,
+                 mac_addr='00005e00535f',
+                 usb_gadget_path='/sys/kernel/config/usb_gadget/pi-control-ns',
+                 body_color='ff0000',
+                 button_color='ffff00',
+                 left_grip_color='00ff00',
+                 right_grip_color='0000ff'):
         self.control_data = bytearray.fromhex('810000000008800008800c')
         self.control = self.ControlStruct.from_buffer(self.control_data)
         self.counter = 0
-        self.mac_addr = '00005e00535f'
+        self.mac_addr = mac_addr
 
         self.input_looping = False
         self.close_req = False
         self.base_path = usb_gadget_path
         self.badget = None
 
+        self.spi_rom = {
+            0x60:
+            bytearray.fromhex('ffff ffff ffff ffff ffff ffff ffff ffff'
+                              'ffff ffff ffff ffff ffff ff02 ffff ffff'
+                              'ffff ffff ffff ffff ffff ffff ffff ffff'
+                              'ffff ffff ffff ffff ffff ffff fff9 255f'
+                              'b217 7903 665f 8357 7201 3661 0e56 66ff'
+                              '2c2c c3d1 1515 0e62 27c1 c32c ffff ffff'
+                              'ffff ffff ffff ffff ffff ffff ffff ffff'
+                              'ffff ffff ffff ffff ffff ffff ffff ffff'
+                              '50fd 0000 c60f 0f30 61ae 90d9 d414 5441'
+                              '1554 c779 9c33 3663 0f30 61ae 90d9 d414'
+                              '5441 1554 c779 9c33 3663'),
+            0x80:
+            bytearray.fromhex('ffff ffff ffff ffff ffff ffff ffff ffff'
+                              'ffff ffff ffff ffff ffff ffff ffff ffff'
+                              'ffff ffff ffff b2a1 aeff e7ff ec01 0040'
+                              '0040 0040 eaff 0f00 0700 e73b e73b e73b')
+        }
+
+        # コントローラ色をカスタム
+        self.spi_rom[0x60][0x50:0x53] = bytes.fromhex(body_color)  # body color
+        self.spi_rom[0x60][0x53:0x56] = bytes.fromhex(
+            button_color)  # button color
+        self.spi_rom[0x60][0x56:0x59] = bytes.fromhex(
+            left_grip_color)  # left grip color
+        self.spi_rom[0x60][0x59:0x5c] = bytes.fromhex(
+            right_grip_color)  # right grip color
+
     def start(self):
         # Re-connect USB Gadget device
         os.system(f'echo > {self.base_path}/UDC')
-        os.system(
-            f'ls /sys/class/udc > {self.base_path}/UDC')
+        os.system(f'ls /sys/class/udc > {self.base_path}/UDC')
         time.sleep(0.8)
 
         self.gadget = os.open('/dev/hidg0', os.O_RDWR | os.O_NONBLOCK)
@@ -161,7 +196,7 @@ class Con:
         # 0x21: コントローラー入力+UART応答
         self.usb_send(0x21, self.counter, buf)
 
-    def spi_send(self, addr, data):
+    def spi_send(self, addr: bytes, data):
         buf = bytearray(addr)
         buf.extend([0x00, 0x00, len(data)])
         buf.extend(data)
@@ -175,33 +210,15 @@ class Con:
             self.usb_send(0x30, self.counter, buf)
             time.sleep(0.03)
 
-    def read_spi_rom(self, spi_addr):
+    def read_spi_rom(self, spi_addr: bytes, data_len):
         """SPIでのROMの読み込み"""
-        if spi_addr == b'\x00\x60':
-            # Serial number
-            hexStr = 'ffff fff1 ffff ffff ff1f ffff f1ff ffff'  # 16byte
-        elif spi_addr == b'\x50\x60':
-            # Controller Color
-            hexStr = '000000 ff0000 ffffff ffffff ff'  # 13byte
-        elif spi_addr == b'\x80\x60':
-            # Factory Sensor and Stick device parameters
-            hexStr = '50fd0000c60f0f30619630f3d41454411554c7799c333663'  # 24byte
-        elif spi_addr == b'\x98\x60':
-            # Factory Stick device parameters 2
-            hexStr = '0f30619630f3d41454411554c7799c3336 63'  # 18byte
-        elif spi_addr == b'\x3d\x60':
-            # Factory configuration & calibration 2
-            hexStr = 'ba156211b87f29065bffe77e0e36569e8560ff323232ffffff'  # 25byte
-        elif spi_addr == b'\x10\x80':
-            # User Analog sticks calibration
-            hexStr = 'ffffffffffffffffffffffffffffffffffffffffffffb2a1'
-        elif spi_addr == b'\x28\x80':
-            # User 6-Axis Motion Sensor calibration
-            hexStr = 'beff3e00f001004000400040fefffeff0800e73be73be73b'
-        else:
-            print("Unknown SPI address:", spi_addr.hex())
+        try:
+            addr1 = spi_addr[1]
+            addr2 = spi_addr[0]
+            return self.spi_rom[addr1][addr2:addr2 + data_len]
+        except IndexError:
+            print(f'{spi_addr}({data_len}) is not found')
             return None
-        return bytes.fromhex(hexStr)
 
     def uart_interact(self, subcmd, data):
         """UARTでの対話"""
@@ -212,7 +229,7 @@ class Con:
             # Request device info
             self.uart_send(
                 0x82, subcmd,
-                bytes.fromhex('0421 03 02' + self.mac_addr[::-1] + '03 01'))
+                bytes.fromhex('0421 03 02' + self.mac_addr[::-1] + '03 02'))
         elif subcmd == 0x03 or subcmd == 0x08 or subcmd == 0x30 or subcmd == 0x38 or subcmd == 0x40 or subcmd == 0x48:
             self.uart_send(0x80, subcmd, [])
         elif subcmd == 0x04:
@@ -224,9 +241,8 @@ class Con:
         elif subcmd == 0x10:
             # SPI flash read
             spi_addr = data[:2]
-            rom_data = self.read_spi_rom(spi_addr)
-            if data[4] != len(rom_data):
-                print(f'Request and response sizes are different.')
+            data_len = data[4]
+            rom_data = self.read_spi_rom(spi_addr, data_len)
             if rom_data != None:
                 self.spi_send(spi_addr, rom_data)
         else:
@@ -253,12 +269,12 @@ class Con:
                         print('baudrate設定', data[2:].hex())
                     elif data[1] == 0x04:
                         # Enable USB HID Joystick report
-                        print('送信の開始の指示された[0x8004]')
+                        print('送信の開始の指示された')
                         self.input_looping = True
                         threading.Thread(target=self.send_input_loop).start()
                     elif data[1] == 0x05:
                         # Disable USB HID Joystick report
-                        print('送信の終了の指示[0x8005]')
+                        print('送信の終了の指示')
                         self.input_looping = False
                     else:
                         print('>>>', data.hex())
@@ -291,7 +307,7 @@ if __name__ == '__main__':
 
     except Exception as e:
         print(f'不明なエラー[{e}]')
-    
+
     finally:
         con.close()
         sys.exit()
