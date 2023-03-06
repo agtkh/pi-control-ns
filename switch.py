@@ -259,22 +259,20 @@ class Con:
                 if data[0] == 0x80:
                     if data[1] == 0x01:
                         # MACアドレスの要求
-                        print('MACアドレスが要求された')
+                        print('Requested MAC addr')
                         self.usb_send(0x81, data[1],
                                       bytes.fromhex('0003' + self.mac_addr))
                     elif data[1] == 0x02:
-                        print('ハンドシェイク')
+                        print('Handshake')
                         self.usb_send(0x81, data[1], [])
                     elif data[1] == 0x03:
-                        print('baudrate設定', data[2:].hex())
+                        print('baudrate setting', data[2:].hex())
                     elif data[1] == 0x04:
-                        # Enable USB HID Joystick report
-                        print('送信の開始の指示された')
+                        print('Enable USB HID Joystick report')
                         self.input_looping = True
                         threading.Thread(target=self.send_input_loop).start()
                     elif data[1] == 0x05:
-                        # Disable USB HID Joystick report
-                        print('送信の終了の指示')
+                        print('Disable USB HID Joystick report')
                         self.input_looping = False
                     else:
                         print('>>>', data.hex())
@@ -303,10 +301,10 @@ if __name__ == '__main__':
             con.push_button(btn, delay=0.2)
 
     except KeyboardInterrupt as e:
-        print("\nCtrl-Cなどで終了")
+        print("\nExiting with keyboard interrupt")
 
     except Exception as e:
-        print(f'不明なエラー[{e}]')
+        print(f'Unknown exception: {e}]')
 
     finally:
         con.close()
