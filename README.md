@@ -1,9 +1,12 @@
 # pi-control-ns
-## 
+## Usage  
+editing...
 
-## Demo
+## Demo  
+editing...
 
-
+## Files  
+editing...
 
 ## GPL v3
 See [LICENCE.txt](LICENCE.txt)  
